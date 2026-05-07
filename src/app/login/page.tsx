@@ -3,7 +3,9 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 
-interface SessionResult {
+interface TokenResult {
+  tokens: { id_token: string; access_token: string; expires_in: number };
+  decoded_id_token: Record<string, unknown>;
   session: { email: string; name: string | null; expires_at: number };
 }
 
@@ -18,7 +20,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-  const [result, setResult] = useState<SessionResult | null>(null);
+  const [result, setResult] = useState<TokenResult | null>(null);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,11 +52,29 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-16">
       <div className="w-full max-w-md">
+        {/* Card */}
         <div className="bg-white rounded-2xl shadow-lg p-10">
+          {/* Header */}
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold text-slate-800">Sign In</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Welcome back. Enter your credentials to continue.
+            </p>
           </div>
 
+          {/* Error banner */}
+          {errorMsg && (
+            <div className="mb-6 flex items-start gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <svg className="mt-0.5 h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              {errorMsg}
+            </div>
+          )}
           {errorMsg && <div className="mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{errorMsg}</div>}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -70,11 +90,27 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-
+      
+       {/* Decoded JWT panel – shown after successful sign-in */}
       {result && (
-        <div className="mt-10 w-full max-w-2xl rounded-xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-800">
-          Signed in as <strong>{result.session.name ?? result.session.email}</strong>. Session expires at{" "}
-          {new Date(result.session.expires_at * 1000).toLocaleString()}.
+        <div className="mt-10 w-full max-w-2xl">
+          <div className="rounded-2xl bg-white shadow-lg overflow-hidden">
+            <div className="border-b border-slate-200 bg-slate-800 px-6 py-3 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                Decoded ID Token
+              </span>
+              <span className="text-xs text-slate-400">
+                expires in {result.tokens.expires_in}s
+              </span>
+            </div>
+            <pre className="overflow-x-auto p-6 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-all">
+              {JSON.stringify(result.decoded_id_token, null, 2)}
+            </pre>
+          </div>
+          <div className="mt-10 w-full max-w-2xl rounded-xl bg-emerald-50 border border-emerald-200 p-6 text-emerald-800">
+            Signed in as <strong>{result.session.name ?? result.session.email}</strong>. Session expires at{" "}
+            {new Date(result.session.expires_at * 1000).toLocaleString()}.
+          </div>        
         </div>
       )}
     </main>
