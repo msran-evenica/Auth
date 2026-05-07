@@ -63,8 +63,16 @@ export async function POST(request: NextRequest) {
   const idToken = tokenData.id_token as string;
   const decoded = decodeJwtPayload(idToken);
   const exp = typeof decoded.exp === "number" ? decoded.exp : Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const session = await createSessionCookieValue({
+    sub: String(decoded.sub ?? ""),
+    email: String(decoded.email ?? ""),
+    name: typeof decoded.name === "string" ? decoded.name : undefined,
+    exp,
+    refresh_token: typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : undefined,
+    decoded_id_token: decoded,
+  });
   
-  return NextResponse.json({
+  const response = NextResponse.json({
     session: {
       email: String(decoded.email),
       name: typeof decoded.name === "string" ? decoded.name : null,
@@ -77,4 +85,16 @@ export async function POST(request: NextRequest) {
     },
     decoded_id_token: decoded,
   });
+
+  response.cookies.set({
+    name: SESSION_COOKIE_NAME,
+    value: session,
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_TTL_SECONDS,
+  });
+
+  return response;
 }

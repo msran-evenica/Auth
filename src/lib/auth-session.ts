@@ -9,11 +9,7 @@ export type SessionPayload = {
   email: string;
   name?: string;
   exp: number;
-  tokens: {
-      id_token: string,
-      access_token: string,
-      expires_in: number,
-    },
+  refresh_token?: string;
   decoded_id_token: Record<string, unknown>;
 };
 

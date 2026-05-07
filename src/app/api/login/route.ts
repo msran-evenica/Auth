@@ -83,11 +83,7 @@ export async function POST(request: NextRequest) {
     email: String(decoded.email ?? email),
     name: typeof decoded.name === "string" ? decoded.name : undefined,
     exp,
-    tokens: {
-      id_token: tokenData.id_token as string,
-      access_token: tokenData.access_token as string,
-      expires_in: tokenData.expires_in as number,
-    },
+    refresh_token: typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : undefined,
     decoded_id_token: decoded,
   });
 

@@ -1,6 +1,16 @@
 ﻿import Link from "next/link";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { SESSION_COOKIE_NAME, readSessionCookieValue } from "@/lib/auth-session";
 
-export default function Home() {
+export default async function Home() {
+  const cookieStore = await cookies();
+  const session = await readSessionCookieValue(cookieStore.get(SESSION_COOKIE_NAME)?.value);
+
+  if (session) {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-gradient-to-br from-slate-50 to-slate-100 px-4 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100">

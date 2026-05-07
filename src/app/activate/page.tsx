@@ -2,20 +2,16 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // ---- types ------------------------------------------------------------------
 
-type Step = "credentials" | "otp" | "success" | "error";
+type Step = "credentials" | "otp" | "error";
 
 interface OtpMeta {
   continuation_token: string;
   challenge_target_label: string;
   code_length: number;
-}
-
-interface TokenResult {
-  tokens: { id_token: string; access_token: string; expires_in: number };
-  decoded_id_token: Record<string, unknown>;
 }
 
 // ---- helpers ----------------------------------------------------------------
@@ -35,6 +31,8 @@ function friendlyError(error: string, suberror?: string): string {
 // ---- page -------------------------------------------------------------------
 
 export default function ActivatePage() {
+  const router = useRouter();
+
   // step state
   const [step, setStep] = useState<Step>("credentials");
 
@@ -51,9 +49,6 @@ export default function ActivatePage() {
 
   // shared error
   const [errorMsg, setErrorMsg] = useState("");
-
-  // success
-  const [result, setResult] = useState<TokenResult | null>(null);
 
   const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
@@ -114,52 +109,13 @@ export default function ActivatePage() {
         return;
       }
 
-      setResult(data);
-      setStep("success");
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setErrorMsg("Could not connect to the server. Please try again.");
     } finally {
       setOtpLoading(false);
     }
-  }
-
-  // ---- render success -------------------------------------------------------
-  if (step === "success" && result) {
-    return (
-      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 px-4 py-16">
-        <div className="mx-auto max-w-2xl">
-          {/* success header */}
-          <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-800">Account Activated!</h1>
-            <p className="mt-1 text-slate-500">You are now signed in. Your decoded ID token is shown below.</p>
-          </div>
-
-          {/* decoded token viewer */}
-          <div className="rounded-2xl bg-white shadow-lg overflow-hidden">
-            <div className="border-b border-slate-200 bg-slate-800 px-6 py-3 flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Decoded ID Token</span>
-            </div>
-            <pre className="overflow-x-auto p-6 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap break-all">
-              {JSON.stringify(result.decoded_id_token, null, 2)}
-            </pre>
-          </div>
-
-          <div className="mt-6 text-center">
-            <Link
-              href="/login"
-              className="inline-block rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
-            >
-              Go to Sign In
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
   }
 
   // ---- shared card wrapper --------------------------------------------------
@@ -194,7 +150,7 @@ export default function ActivatePage() {
           {/* step indicator */}
           <div className="mb-6 flex items-center gap-2">
             <div className={`h-2 flex-1 rounded-full transition-colors ${step !== "credentials" ? "bg-indigo-500" : "bg-indigo-500"}`} />
-            <div className={`h-2 flex-1 rounded-full transition-colors ${step === "otp" || step === "success" ? "bg-indigo-500" : "bg-slate-200"}`} />
+            <div className={`h-2 flex-1 rounded-full transition-colors ${step === "otp" ? "bg-indigo-500" : "bg-slate-200"}`} />
           </div>
 
           {/* error banner */}
