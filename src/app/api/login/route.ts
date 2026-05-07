@@ -78,18 +78,24 @@ export async function POST(request: NextRequest) {
   const idToken = tokenData.id_token as string;
   const decoded = decodeJwtPayload(idToken);
   const exp = typeof decoded.exp === "number" ? decoded.exp : Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const session = createSessionCookieValue({
+  const session = await createSessionCookieValue({
     sub: String(decoded.sub ?? ""),
     email: String(decoded.email ?? email),
     name: typeof decoded.name === "string" ? decoded.name : undefined,
     exp,
+    tokens: {
+      id_token: tokenData.id_token as string,
+      access_token: tokenData.access_token as string,
+      expires_in: tokenData.expires_in as number,
+    },
+    decoded_id_token: decoded,
   });
 
   const response = NextResponse.json({
     tokens: {
-      id_token: tokenData.id_token,
-      access_token: tokenData.access_token,
-      expires_in: tokenData.expires_in,
+      id_token: tokenData.id_token as string,
+      access_token: tokenData.access_token as string,
+      expires_in: tokenData.expires_in as number,
     },
     decoded_id_token: decoded,
     session: {

@@ -1,23 +1,40 @@
+import { symmetricDecodeJWT, symmetricEncodeJWT } from "better-auth/crypto";
+
 const SESSION_COOKIE_NAME = "auth_session";
 const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
+const SESSION_TOKEN_SALT = "entra-session";
 
 export type SessionPayload = {
   sub: string;
   email: string;
   name?: string;
   exp: number;
+  tokens: {
+      id_token: string,
+      access_token: string,
+      expires_in: number,
+    },
+  decoded_id_token: Record<string, unknown>;
 };
 
-export function createSessionCookieValue(payload: SessionPayload): string {
-  return Buffer.from(JSON.stringify(payload), "utf-8").toString("base64url");
+function getSessionSecret() {
+  const secret = process.env.BETTER_AUTH_SECRET ?? process.env.APP_SESSION_SECRET;
+  if (!secret) {
+    throw new Error("BETTER_AUTH_SECRET (or APP_SESSION_SECRET) must be set for session handling");
+  }
+  return secret;
 }
 
-export function readSessionCookieValue(value: string | undefined): SessionPayload | null {
+export async function createSessionCookieValue(payload: SessionPayload): Promise<string> {
+  return symmetricEncodeJWT(payload, getSessionSecret(), SESSION_TOKEN_SALT, SESSION_TTL_SECONDS);
+}
+
+export async function readSessionCookieValue(value: string | undefined): Promise<SessionPayload | null> {
   if (!value) return null;
 
   try {
-    const json = Buffer.from(value, "base64url").toString("utf-8");
-    const parsed = JSON.parse(json) as SessionPayload;
+    const decoded = await symmetricDecodeJWT(value, getSessionSecret(), SESSION_TOKEN_SALT);
+    const parsed = decoded as SessionPayload;
 
     if (!parsed.sub || !parsed.email || !parsed.exp) {
       return null;

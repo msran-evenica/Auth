@@ -3,7 +3,7 @@ import { SESSION_COOKIE_NAME, readSessionCookieValue } from "@/lib/auth-session"
 
 export async function GET(request: NextRequest) {
   const cookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const session = readSessionCookieValue(cookie);
+  const session = await readSessionCookieValue(cookie);
 
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
