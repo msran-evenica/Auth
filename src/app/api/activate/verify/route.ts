@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signupContinueOtp, getTokenAfterSignup, decodeJwtPayload } from "@/lib/entra";
+import { SESSION_COOKIE_NAME, SESSION_TTL_SECONDS, createSessionCookieValue } from "@/lib/auth-session";
 
 /**
  * POST /api/activate/verify
@@ -61,8 +62,14 @@ export async function POST(request: NextRequest) {
 
   const idToken = tokenData.id_token as string;
   const decoded = decodeJwtPayload(idToken);
-
+  const exp = typeof decoded.exp === "number" ? decoded.exp : Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  
   return NextResponse.json({
+    session: {
+      email: String(decoded.email),
+      name: typeof decoded.name === "string" ? decoded.name : null,
+      expires_at: exp,
+    },
     tokens: {
       id_token: tokenData.id_token,
       access_token: tokenData.access_token,
