@@ -1,11 +1,13 @@
-const SESSION_COOKIE_NAME = "auth_session";
-const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
+export const SESSION_COOKIE_NAME = "auth_session";
 
 export type SessionPayload = {
   sub: string;
   email: string;
   name?: string;
   exp: number;
+  id_token: string;
+  refresh_token: string;
+  decoded_id_token: Record<string, unknown>;
 };
 
 export function createSessionCookieValue(payload: SessionPayload): string {
@@ -19,11 +21,7 @@ export function readSessionCookieValue(value: string | undefined): SessionPayloa
     const json = Buffer.from(value, "base64url").toString("utf-8");
     const parsed = JSON.parse(json) as SessionPayload;
 
-    if (!parsed.sub || !parsed.email || !parsed.exp) {
-      return null;
-    }
-
-    if (parsed.exp * 1000 < Date.now()) {
+    if (!parsed.sub || !parsed.email || !parsed.exp || !parsed.refresh_token || !parsed.id_token) {
       return null;
     }
 
@@ -33,4 +31,6 @@ export function readSessionCookieValue(value: string | undefined): SessionPayloa
   }
 }
 
-export { SESSION_COOKIE_NAME, SESSION_TTL_SECONDS };
+export function isExpired(epochSeconds: number): boolean {
+  return epochSeconds * 1000 <= Date.now();
+}
