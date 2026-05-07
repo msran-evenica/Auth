@@ -106,8 +106,19 @@ export function signinToken(continuation_token: string, password: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Token endpoint (used after sign-up OTP verification)
+// Token refresh and exchange endpoints
 // ---------------------------------------------------------------------------
+
+
+export function refreshWithToken(refresh_token: string) {
+  return post("/oauth2/v2.0/token", {
+    client_id: CLIENT_ID!,
+    grant_type: "refresh_token",
+    refresh_token,
+    scope: "openid offline_access profile",
+  });
+}
+
 
 /**
  * Exchange a post-signup continuation_token for security tokens.
