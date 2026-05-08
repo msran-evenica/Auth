@@ -1,11 +1,12 @@
 import { makeSignature } from "better-auth/crypto";
 import { auth } from "@/lib/auth";
+import {
+  SESSION_COOKIE_MAX_AGE_SECONDS,
+  SESSION_COOKIE_NAME,
+  SESSION_TTL_SECONDS,
+  SESSION_UPDATE_AGE_SECONDS,
+} from "@/lib/auth-constants";
 import { decodeJwtPayload, refreshTokens } from "@/lib/entra";
-
-const SESSION_TTL_SECONDS = 60 * 60; // 1 hour
-const SESSION_COOKIE_NAME = "better-auth.session_token";
-const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
-const TOKEN_REFRESH_THRESHOLD_SECONDS = 5 * 60;
 
 export type SessionPayload = {
   sub: string;
@@ -14,6 +15,7 @@ export type SessionPayload = {
   exp: number;
   refresh_token?: string;
   decoded_id_token: Record<string, unknown>;
+  idToken?: string;
 };
 
 function getSessionSecret() {
@@ -36,14 +38,18 @@ export async function createSessionCookieValue(payload: SessionPayload): Promise
       emailVerified: true,
     }));
 
+  await internalAdapter.deleteSessions(user.id);
+
   const session = await internalAdapter.createSession(
     user.id,
     false,
     {
       expiresAt: new Date(payload.exp * 1000),
       decodedIdToken: payload.decoded_id_token,
-      entraRefreshToken: payload.refresh_token,
+      entraExternalIdToken: payload.idToken,
+      entraExternalRefreshToken: payload.refresh_token,
     },
+    true,
   );
 
   const signedToken = `${session.token}.${await makeSignature(session.token, getSessionSecret())}`;
@@ -58,19 +64,42 @@ export async function createSessionCookieValue(payload: SessionPayload): Promise
   });
 }
 
-async function refreshSessionIfNeeded(session: Awaited<ReturnType<typeof auth.api.getSession>>) {
+async function readPrivateSessionTokenFields(sessionToken: string) {
+  const { adapter } = await auth.$context;
+  return adapter.findOne<{
+    entraExternalIdToken?: string | null;
+    entraExternalRefreshToken?: string | null;
+  }>({
+    model: "session",
+    where: [
+      {
+        field: "token",
+        value: sessionToken,
+      },
+    ],
+  });
+}
+
+async function refreshSessionIfNeeded(
+  session: Awaited<ReturnType<typeof auth.api.getSession>>,
+  forceRefresh = false,
+) {
   if (!session) return null;
 
-  const remainingSeconds = Math.floor((session.session.expiresAt.getTime() - Date.now()) / 1000);
-  if (remainingSeconds > TOKEN_REFRESH_THRESHOLD_SECONDS) {
+  const refreshAt =
+    session.session.expiresAt.getTime() -
+    SESSION_TTL_SECONDS * 1000 +
+    SESSION_UPDATE_AGE_SECONDS * 1000;
+
+  if (!forceRefresh && refreshAt > Date.now()) {
     return session;
   }
 
   const { internalAdapter } = await auth.$context;
-  const stored = await internalAdapter.findSession(session.session.token);
+  const stored = await readPrivateSessionTokenFields(session.session.token);
   const refreshToken =
-    stored?.session.entraRefreshToken && typeof stored.session.entraRefreshToken === "string"
-      ? stored.session.entraRefreshToken
+    stored?.entraExternalRefreshToken && typeof stored.entraExternalRefreshToken === "string"
+      ? stored.entraExternalRefreshToken
       : null;
 
   if (!refreshToken) return session;
@@ -88,8 +117,10 @@ async function refreshSessionIfNeeded(session: Awaited<ReturnType<typeof auth.ap
 
   await internalAdapter.updateSession(session.session.token, {
     expiresAt: new Date(exp * 1000),
+    updatedAt: new Date(),
     decodedIdToken: decoded,
-    entraRefreshToken:
+    entraExternalIdToken: tokenData.id_token,
+    entraExternalRefreshToken:
       typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : refreshToken,
   });
 
@@ -100,23 +131,35 @@ async function refreshSessionIfNeeded(session: Awaited<ReturnType<typeof auth.ap
         getSessionSecret(),
       )}`,
     }),
-    query: { disableCookieCache: true },
+    query: { disableCookieCache: true, disableRefresh: true },
   });
 }
 
-export async function readSessionCookieValueFromHeaders(headers: Headers): Promise<SessionPayload | null> {
+export async function readSessionCookieValueFromHeaders(
+  headers: Headers,
+  options?: { forceRefresh?: boolean },
+): Promise<SessionPayload | null> {
   const currentSession = await auth.api.getSession({
     headers,
-    query: { disableCookieCache: true },
+    query: { disableCookieCache: true, disableRefresh: true },
   });
-  const session = await refreshSessionIfNeeded(currentSession);
+  const session = await refreshSessionIfNeeded(currentSession, options?.forceRefresh);
 
   if (!session) return null;
+  const storedSession = await readPrivateSessionTokenFields(session.session.token);
 
   const decodedIdToken =
     session.session.decodedIdToken && typeof session.session.decodedIdToken === "object"
       ? (session.session.decodedIdToken as Record<string, unknown>)
       : {};
+  const idToken =
+    storedSession?.entraExternalIdToken && typeof storedSession.entraExternalIdToken === "string"
+      ? storedSession.entraExternalIdToken
+      : undefined;
+  const refreshToken =
+    storedSession?.entraExternalRefreshToken && typeof storedSession.entraExternalRefreshToken === "string"
+      ? storedSession.entraExternalRefreshToken
+      : undefined;
 
   return {
     sub: session.user.id,
@@ -124,6 +167,8 @@ export async function readSessionCookieValueFromHeaders(headers: Headers): Promi
     name: session.user.name,
     exp: Math.floor(session.session.expiresAt.getTime() / 1000),
     decoded_id_token: decodedIdToken,
+    idToken,
+    refresh_token: refreshToken,
   };
 }
 
@@ -165,5 +210,5 @@ export {
   SESSION_COOKIE_MAX_AGE_SECONDS,
   SESSION_COOKIE_NAME,
   SESSION_TTL_SECONDS,
-  TOKEN_REFRESH_THRESHOLD_SECONDS,
+  SESSION_UPDATE_AGE_SECONDS,
 };
