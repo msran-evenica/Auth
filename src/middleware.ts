@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, readSessionCookieValue } from "@/lib/auth-session";
+import { getSessionCookie } from "better-auth/cookies";
 
-export async function middleware(request: NextRequest) {
-  const session = await readSessionCookieValue(
-    request.cookies.get(SESSION_COOKIE_NAME)?.value
-  );
+export function middleware(request: NextRequest) {
+  const session = getSessionCookie(request) !== null;
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/dashboard") && !session) {

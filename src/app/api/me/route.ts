@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE_NAME, readSessionCookieValue } from "@/lib/auth-session";
+import { readSessionCookieValueFromHeaders } from "@/lib/auth-session";
 
 export async function GET(request: NextRequest) {
-  const cookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const session = await readSessionCookieValue(cookie);
+  const session = await readSessionCookieValueFromHeaders(request.headers);
 
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -16,5 +15,6 @@ export async function GET(request: NextRequest) {
       name: session.name ?? null,
       expires_at: session.exp,
     },
+    decoded_id_token: session.decoded_id_token,
   });
 }

@@ -122,6 +122,18 @@ export function getTokenAfterSignup(continuation_token: string) {
   });
 }
 
+/**
+ * Rotate security tokens with the refresh token returned by Entra.
+ */
+export function refreshTokens(refresh_token: string) {
+  return post("/oauth2/v2.0/token", {
+    client_id: CLIENT_ID!,
+    grant_type: "refresh_token",
+    refresh_token,
+    scope: "openid offline_access profile",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // JWT helpers
 // ---------------------------------------------------------------------------

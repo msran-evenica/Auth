@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { signupContinueOtp, getTokenAfterSignup, decodeJwtPayload } from "@/lib/entra";
-import { SESSION_COOKIE_NAME, SESSION_TTL_SECONDS, createSessionCookieValue } from "@/lib/auth-session";
+import {
+  SESSION_COOKIE_MAX_AGE_SECONDS,
+  SESSION_TTL_SECONDS,
+  createSessionCookieValue,
+  getBetterAuthCookieFromSerializedSession,
+} from "@/lib/auth-session";
 
 /**
  * POST /api/activate/verify
@@ -63,14 +68,14 @@ export async function POST(request: NextRequest) {
   const idToken = tokenData.id_token as string;
   const decoded = decodeJwtPayload(idToken);
   const exp = typeof decoded.exp === "number" ? decoded.exp : Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const session = await createSessionCookieValue({
+  const sessionCookie = getBetterAuthCookieFromSerializedSession(await createSessionCookieValue({
     sub: String(decoded.sub ?? ""),
     email: String(decoded.email ?? ""),
     name: typeof decoded.name === "string" ? decoded.name : undefined,
     exp,
     refresh_token: typeof tokenData.refresh_token === "string" ? tokenData.refresh_token : undefined,
     decoded_id_token: decoded,
-  });
+  }));
   
   const response = NextResponse.json({
     session: {
@@ -87,13 +92,10 @@ export async function POST(request: NextRequest) {
   });
 
   response.cookies.set({
-    name: SESSION_COOKIE_NAME,
-    value: session,
-    httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_TTL_SECONDS,
+    ...sessionCookie.attributes,
+    name: sessionCookie.name,
+    value: sessionCookie.value,
+    maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
   });
 
   return response;
